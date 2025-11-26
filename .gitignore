@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Distribution / build
+build/
+dist/
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# VS Code / editors
+.vscode/
+.idea/
+
+# Logs / caches
+*.log
+.pytest_cache/
+
+# Word temp files
+~$*.docx
+
+# Local saves created by the app
+bulk_found/
