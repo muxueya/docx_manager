@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Unified blue / grey / white palette */
+        :root {
+            --bg: #f5f7fb;
+            --card: #ffffff;
+            --panel-border: #e3e7ee;
+            --muted: #6b7280;
+            --accent: #1d4ed8;
+            --accent-2: #3b82f6;
+            --danger: #dc2626;   /* alerts only */
+            --success: #15803d;  /* alerts/status */
+            --text: #111827;
+        }
+
+        body {
+            padding: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #eef2f7 100%);
+            color: var(--text);
+            font-family: "Inter", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        }
+
+        /* File Tree */
+        .file-tree {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid var(--panel-border);
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 10px;
+        }
+
+        .file-item { cursor: pointer; padding: 6px 10px; border-radius: 6px; color: var(--text); display:flex; align-items:center; gap:8px; }
+        .file-item:hover { background-color: rgba(37,99,235,0.08); color: var(--accent); }
+
+        .folder-item { font-weight: 600; color: var(--text); margin-top: 6px; }
+        .nested { margin-left: 18px; border-left: 1px dashed var(--panel-border); padding-left: 8px; }
+
+        /* Cards / Panels */
+        .card { background: var(--card); border: 1px solid var(--panel-border); color: var(--text); border-radius: 10px; box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08); }
+        .card .card-title { color: var(--text); }
+
+        /* Tabs */
+        .nav-tabs { border-bottom: 1px solid var(--panel-border); }
+        .nav-tabs .nav-link { color: var(--muted); background: transparent; border: 1px solid transparent; margin-right: 6px; border-radius: 8px 8px 0 0; padding: 8px 12px; }
+        .nav-tabs .nav-link:hover { color: var(--accent); }
+        .nav-tabs .nav-link.active { color: var(--accent); background: #e8f1ff; border-color: #d6e6ff; box-shadow: inset 0 -2px 0 var(--accent); }
+
+        /* Tab content panel */
+        .tab-content { background: #f8fafc; border: 1px solid var(--panel-border); padding: 16px; border-radius: 0 8px 8px 8px; color: var(--text); }
+
+        /* Badges */
+        .badge-tracked { background-color: var(--danger); color: #fff; }
+        .badge-clean { background-color: var(--success); color: #fff; }
+
+        /* Snippet highlight */
+        .highlight-match { background-color: #fde68a; font-weight: 600; padding: 0 3px; border-radius: 3px; color:#111827 }
+
+        /* Subsection card inside tabs */
+        .section-card { background: #f9fafb; border: 1px solid var(--panel-border); padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+        .section-title { font-weight: 700; color: var(--text); margin-bottom: 8px; }
+
+        /* Light-ish panel for tables and controls */
+        .light-panel { background: #ffffff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 12px; color: var(--text); box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06); }
+
+        /* Inputs & tables */
+        input.form-control { background: #fff; border: 1px solid var(--panel-border); color: var(--text); }
+        .table thead { background: #f3f6fb; }
+        .table tr:nth-child(even) { background: #f9fbff; }
+
+        .btn-accent { background: var(--accent); color: #fff; border: none; }
+        .btn-accent:hover { opacity: .95 }
+
+        .table { color: var(--text); background: transparent; border-color: var(--panel-border); }
+        .table th, .table td { background: transparent; border-color: var(--panel-border); }
+        .table thead.table-light, .table thead th { background: #f3f6fb; color: var(--text); }
+        .table tbody tr { background: transparent; }
+        .table.table-bordered th, .table.table-bordered td { border: 1px solid var(--panel-border); }
+
+        .table-light { background-color: #f3f6fb !important; color: var(--text) !important; }
+
+        .btn-primary { background: linear-gradient(90deg,var(--accent), var(--accent-2)); color: #fff; border: none; }
+        .btn-info { background: rgba(29,78,216,0.08); color: var(--accent); border: 1px solid rgba(29,78,216,0.12); }
+        .btn-danger { background: var(--danger); color: #fff; border: none; }
+        .btn-secondary { background: #f3f4f6; color: var(--text); border: 1px solid var(--panel-border); }
+        .btn-outline-secondary { color: var(--text); border-color: var(--panel-border); background: #fff; }
+        .btn:focus, .btn:active { box-shadow: none !important; }
+
+        .progress-bar { background: var(--accent); }
+
+        .alert { background: #f9fafb; color: var(--text); border: 1px solid var(--panel-border); }
+        .alert-info { background: #e0edff; color: #0f172a; }
+        .alert-success { background: #e2f6eb; color: #14532d; }
+        .alert-danger { background: #fdecec; color: #7f1d1d; }
+    </style>
+</head>
+
+<body>
+
+    <div class="container shell">
+        <h2 class="mb-4">📄 DOCX File Manager</h2>
+
+        <div class="card p-4 mb-4 shadow-sm glass">
+            <label class="form-label fw-bold">Select Local Folder</label>
+            <div class="input-group">
+                <button class="btn btn-outline-secondary" type="button" onclick="openFolderPicker(this)">Browse…</button>
+                <input type="text" id="folderPath" class="form-control"
+                    placeholder="Enter full absolute path (e.g., C:/Users/Docs or /home/usr/docs)">
+                <button class="btn btn-primary" onclick="scanFolder()">Scan Directory</button>
+            </div>
+            <small class="text-muted">Use Browse to open a system folder picker (Windows/macOS), or type a path manually.</small>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card p-3 shadow-sm h-100 glass">
+                    <h5 class="card-title">File Structure</h5>
+                    <hr>
+                    <div id="fileTree" class="file-tree">
+                        <span class="text-muted fst-italic">No folder scanned yet.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card p-3 shadow-sm h-100 glass" id="actionPanel" style="opacity: 0.6; pointer-events: none;">
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 id="selectedFileName" class="text-primary">Select a file from the tree</h5>
+                        <span id="trackChangeBadge" class="badge rounded-pill" style="display:none;"></span>
+                    </div>
+
+                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" id="bulk-tab" data-bs-toggle="tab"
+                                data-bs-target="#bulk" type="button">📚 Bulk Tools</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="details-tab" data-bs-toggle="tab"
+                                data-bs-target="#details" type="button" disabled aria-disabled="true">🔗 Links & Info</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" id="find-tab" data-bs-toggle="tab" data-bs-target="#find"
+                                type="button" disabled aria-disabled="true">🔎 Find & Replace</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content p-3">
+
+                        <div class="tab-pane fade" id="details">
+                            <h6>Hyperlinks Detected:</h6>
+                            <div style="max-height: 520px; overflow-y: auto;">
+                                <table class="table table-sm table-hover table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Text</th>
+                                            <th>URL</th>
+                                            <th>Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="linkTableBody">
+                                        <tr>
+                                            <td colspan="3">Select a file to analyze...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="find">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Find Text</label>
+                                    <input type="text" id="findInput" class="form-control" placeholder="Word to find">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Replace With (Optional)</label>
+                                    <input type="text" id="replaceInput" class="form-control"
+                                        placeholder="Replacement word">
+                                </div>
+
+                                <div class="col-12 d-flex align-items-center">
+                                    <div class="d-flex gap-2" style="flex:1">
+                                        <button class="btn btn-info text-gray" onclick="performAction(false)">Find Only</button>
+                                        <button class="btn btn-danger" onclick="performAction(true)">Replace All</button>
+                                    </div>
+                                        <div class="form-check ms-3">
+                                            <input class="form-check-input" type="checkbox" value="" id="bulkSaveCopiesCheckbox" checked>
+                                            <label class="form-check-label small text-muted" for="bulkSaveCopiesCheckbox">
+                                                Save copies of modified files to your Desktop (folder: <code>bulk_found</code>)
+                                            </label>
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div id="actionResult" class="alert" style="display:none;"></div>
+
+                                    <ul id="matchList" class="list-group mt-2"
+                                        style="display:none; max-height: 250px; overflow-y: auto;">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade show active" id="bulk">
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="table-responsive" style="max-height: 250px;">
+                        <div class="light-panel mb-2">
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-secondary btn-sm" onclick="loadBulkLinks()">Load Links (all files)</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="exportLinksCsv()" id="exportLinksBtn" disabled>Export Links CSV</button>
+                                <button class="btn btn-success btn-sm" onclick="downloadXlsxFromServer()" id="exportLinksXlsxBtn" disabled>Export Links XLSX</button>
+                                <span id="bulkLinkSummary" class="subtle small"></span>
+                            </div>
+                            <div class="progress my-2" style="height:6px; display:none;" id="bulkProgress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div>
+                            </div>
+                        </div>
+                        <table class="table table-sm table-bordered align-middle light-panel">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>File</th>
+                                    <th>Text</th>
+                                    <th>URL</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bulkLinksBody">
+                                <tr><td colspan="5" class="text-muted">Click "Load Links" to scan all files.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="light-panel">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-2">Dependencies (file ↔ file)</h6>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="sortDependencies('outgoing')">Sort by links to others</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="sortDependencies('incoming')">Sort by incoming links</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="exportDependenciesCsv()">Export Dependencies CSV</button>
+                                <span id="dependencySortLabel" class="subtle small"></span>
+                            </div>
+                        </div>
+                        <div class="table-responsive" style="max-height: 220px;">
+                            <table class="table table-sm table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>File</th>
+                                        <th>Links to other files</th>
+                                        <th>Other files linking here</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dependencyBodyBulk">
+                                    <tr><td colspan="3" class="text-muted">Load links to build dependency summary.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="dependencyDetailsBulk" class="mt-2"></div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <hr>
+                    <h6>Bulk Find / Replace across all files</h6>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">Find Text</label>
+                                    <input type="text" id="bulkFindInput" class="form-control" placeholder="Word to find across all files">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Replace With (Optional)</label>
+                                    <input type="text" id="bulkReplaceInput" class="form-control" placeholder="Replacement word">
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end justify-content-between">
+                                    <div>
+                                        <div class="btn-group">
+                                            <button class="btn btn-info btn-sm text-gray" onclick="bulkFindReplace(false)">Find All</button>
+                                            <button class="btn btn-danger btn-sm" onclick="bulkFindReplace(true)">Replace All</button>
+                                        </div>
+                                    </div>
+                                        <div class="form-check mb-1">
+                                            <input class="form-check-input" type="checkbox" value="" id="bulkSaveCopiesCheckboxBulk" checked>
+                                            <label class="form-check-label small text-muted" for="bulkSaveCopiesCheckboxBulk">
+                                                Save copies to Desktop
+                                            </label>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div id="bulkResult" class="alert" style="display:none;"></div>
+                                    <div class="table-responsive" style="max-height: 250px;">
+                                        <table class="table table-sm table-bordered align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>File</th>
+                                                    <th>Matches</th>
+                                                    <th>Status</th>
+                                                    <th>Example Snippet</th>
+                                                    <th>Saved Copy</th>
+                                                    <th>Error</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="bulkFindBody">
+                                                <tr><td colspan="5" class="text-muted">Run bulk find/replace to see results.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                    <div class="col-12 mt-3">
+                                        <hr>
+                                        <h6>Bulk Links Find / Replace (link text and/or URL)</h6>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Find Text</label>
+                                        <input type="text" id="bulkLinkFindInput" class="form-control" placeholder="Text to find inside link text or URL">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Replace With (Optional)</label>
+                                        <input type="text" id="bulkLinkReplaceInput" class="form-control" placeholder="Replacement text for links">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Target</label>
+                                        <select id="bulkLinkTargetSelect" class="form-select">
+                                            <option value="both">Both (text & URL)</option>
+                                            <option value="name">Link Text Only</option>
+                                            <option value="url">Link URL Only</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end justify-content-between">
+                                        <div>
+                                            <div class="btn-group">
+                                                <button class="btn btn-info btn-sm text-gray" onclick="bulkLinksFindReplace(false)">Find All</button>
+                                                <button class="btn btn-danger btn-sm" onclick="bulkLinksFindReplace(true)">Replace All</button>
+                                            </div>
+                                        </div>
+                                            <div class="form-check mb-1">
+                                                <input class="form-check-input" type="checkbox" value="" id="bulkSaveCopiesCheckboxLinks" checked>
+                                                <label class="form-check-label small text-muted" for="bulkSaveCopiesCheckboxLinks">
+                                                    Save copies to Desktop
+                                                </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div id="bulkLinkResult" class="alert" style="display:none;"></div>
+                                        <div class="table-responsive" style="max-height: 250px;">
+                                            <table class="table table-sm table-bordered align-middle">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>File</th>
+                                                        <th>Matches</th>
+                                                        <th>Status</th>
+                                                        <th>Example Snippet</th>
+                                                        <th>Saved Copy</th>
+                                                        <th>Error</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="bulkLinkFindBody">
+                                                    <tr><td colspan="6" class="text-muted">Run bulk links find/replace to see results.</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentFilePath = '';
+        let cachedBulkLinks = [];
+        let dependencyData = [];
+        let dependencySort = { by: null, dir: 'desc' };
+
+        // --- Folder Picker ---
+        async function openFolderPicker(buttonEl) {
+            if (buttonEl) buttonEl.disabled = true;
+
+            try {
+                const response = await fetch('/pick_folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (data?.error && data.error !== 'No folder selected') alert(data.error);
+                    return;
+                }
+
+                if (data.path) {
+                    document.getElementById('folderPath').value = data.path;
+                    await scanFolder();
+                }
+            } catch (err) {
+                alert('Folder picker failed: ' + err);
+            } finally {
+                if (buttonEl) buttonEl.disabled = false;
+            }
+        }
+
+        // --- 1. Scan Logic ---
+        async function scanFolder() {
+            const path = document.getElementById('folderPath').value;
+            if (!path) return alert("Please enter a path");
+
+            const response = await fetch('/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
+
+            const data = await response.json();
+            if (data.error) return alert(data.error);
+
+            const treeContainer = document.getElementById('fileTree');
+            treeContainer.innerHTML = '';
+            treeContainer.appendChild(createTreeElement(data.structure));
+            document.getElementById('actionPanel').style.opacity = '1';
+            document.getElementById('actionPanel').style.pointerEvents = 'all';
+            document.getElementById('selectedFileName').innerText = "Folder loaded: bulk tools ready, select a file for per-file analysis";
+            setTabState({ enableFileTabs: false, activate: 'bulk' });
+        }
+
+        function createTreeElement(node) {
+            const div = document.createElement('div');
+
+            if (node.type === 'folder') {
+                div.innerHTML = `<div class="folder-item">📂 ${node.name}</div>`;
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'nested';
+                node.children.forEach(child => {
+                    childrenContainer.appendChild(createTreeElement(child));
+                });
+                div.appendChild(childrenContainer);
+            } else {
+                div.innerHTML = `<div class="file-item">📄 ${node.name}</div>`;
+                div.onclick = (e) => {
+                    e.stopPropagation();
+                    selectFile(node.name, node.path);
+                };
+            }
+            return div;
+        }
+
+        function setTabState({ enableFileTabs, activate }) {
+            const bulkBtn = document.getElementById('bulk-tab');
+            const detailsBtn = document.getElementById('details-tab');
+            const findBtn = document.getElementById('find-tab');
+            const tabs = {
+                bulk: document.getElementById('bulk'),
+                details: document.getElementById('details'),
+                find: document.getElementById('find')
+            };
+
+            if (enableFileTabs) {
+                detailsBtn.disabled = false;
+                detailsBtn.removeAttribute('aria-disabled');
+                findBtn.disabled = false;
+                findBtn.removeAttribute('aria-disabled');
+            } else {
+                detailsBtn.disabled = true;
+                detailsBtn.setAttribute('aria-disabled', 'true');
+                findBtn.disabled = true;
+                findBtn.setAttribute('aria-disabled', 'true');
+            }
+
+            if (activate && tabs[activate]) {
+                // reset active classes
+                [bulkBtn, detailsBtn, findBtn].forEach(btn => btn.classList.remove('active'));
+                Object.values(tabs).forEach(pane => pane.classList.remove('show', 'active'));
+                if (activate === 'bulk') bulkBtn.classList.add('active');
+                if (activate === 'details') detailsBtn.classList.add('active');
+                if (activate === 'find') findBtn.classList.add('active');
+                tabs[activate].classList.add('show', 'active');
+            }
+        }
+
+        // --- 2. Select File Logic ---
+        async function selectFile(name, path) {
+            currentFilePath = path;
+            document.getElementById('selectedFileName').innerText = "Analyzing: " + name;
+            document.getElementById('actionPanel').style.opacity = '1';
+            document.getElementById('actionPanel').style.pointerEvents = 'all';
+            setTabState({ enableFileTabs: true, activate: 'details' });
+
+            // Clear UI areas
+            document.getElementById('linkTableBody').innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+            document.getElementById('actionResult').style.display = 'none';
+            document.getElementById('matchList').innerHTML = '';
+            document.getElementById('matchList').style.display = 'none';
+
+            // Backend Call
+            const response = await fetch('/analyze_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
+            const data = await response.json();
+
+            // Update Track Changes
+            const badge = document.getElementById('trackChangeBadge');
+            badge.style.display = 'inline-block';
+            if (data.tracked_changes) {
+                badge.className = 'badge rounded-pill badge-tracked';
+                badge.innerText = 'Track Changes: ON';
+            } else {
+                badge.className = 'badge rounded-pill badge-clean';
+                badge.innerText = 'Track Changes: OFF';
+            }
+
+            // Update Links Table
+            const tbody = document.getElementById('linkTableBody');
+            tbody.innerHTML = '';
+            if (data.links.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-muted">No links found.</td></tr>';
+            } else {
+                data.links.forEach(link => {
+                    const shortUrl = link.url ? (link.url.length > 40 ? link.url.substring(0, 40) + '...' : link.url) : 'No URL';
+                    const row = `<tr>
+                    <td>${link.text}</td>
+                    <td><a href="${link.url}" target="_blank" title="${link.url}">${shortUrl}</a></td>
+                    <td>${link.type}</td>
+                </tr>`;
+                    tbody.innerHTML += row;
+                });
+            }
+        }
+
+        // --- 3. Find/Replace Logic ---
+        async function performAction(isReplace) {
+            const findText = document.getElementById('findInput').value;
+            const replaceText = document.getElementById('replaceInput').value;
+            const resultDiv = document.getElementById('actionResult');
+            const listGroup = document.getElementById('matchList');
+
+            // Reset
+            resultDiv.style.display = 'none';
+            listGroup.style.display = 'none';
+            listGroup.innerHTML = '';
+
+            if (!findText) return alert("Please enter text to find.");
+
+            const payload = {
+                path: currentFilePath,
+                find_text: findText,
+                replace_text: isReplace ? replaceText : null
+            };
+
+            const response = await fetch('/find_replace', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            resultDiv.style.display = 'block';
+
+            if (data.error) {
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerText = 'Error: ' + data.error;
+            } else {
+                // Update Summary Alert
+                resultDiv.className = isReplace ? 'alert alert-success' : 'alert alert-info';
+                resultDiv.innerText = `${data.status}: ${data.matches} occurrence(s).`;
+
+                // Display Snippets
+                if (data.snippets && data.snippets.length > 0) {
+                    listGroup.style.display = 'block';
+
+                    data.snippets.forEach(snippet => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+
+                        // Highlight the search term visually in the snippet
+                        // Uses regex with 'gi' (Global, Case-Insensitive)
+                        const regex = new RegExp(`(${findText})`, 'gi');
+                        const highlightedSnippet = snippet.replace(regex, '<span class="highlight-match">$1</span>');
+
+                        li.innerHTML = `<small class="text-muted">Context:</small><br> "${highlightedSnippet}"`;
+                        listGroup.appendChild(li);
+                    });
+                }
+            }
+        }
+
+        // --- Bulk Links ---
+        async function loadBulkLinks() {
+            const path = document.getElementById('folderPath').value;
+            const tbody = document.getElementById('bulkLinksBody');
+            const exportBtn = document.getElementById('exportLinksBtn');
+            const exportXlsxBtn = document.getElementById('exportLinksXlsxBtn');
+            const summary = document.getElementById('bulkLinkSummary');
+            const progress = document.getElementById('bulkProgress');
+
+            if (!path) return alert("Please select a folder first.");
+
+            tbody.innerHTML = `<tr><td colspan="5">Scanning...</td></tr>`;
+            exportBtn.disabled = true;
+            summary.innerText = '';
+            progress.style.display = 'block';
+
+            try {
+                const res = await fetch('/bulk_links', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Bulk link scan failed');
+
+                cachedBulkLinks = data.files || [];
+                dependencyData = data.dependencies || [];
+                exportBtn.disabled = cachedBulkLinks.length === 0;
+                if (exportXlsxBtn) exportXlsxBtn.disabled = cachedBulkLinks.length === 0;
+
+                renderBulkLinks(cachedBulkLinks);
+                renderDependencies(dependencyData);
+                summary.innerText = `Files scanned: ${cachedBulkLinks.length}, total links: ${data.total_links || 0}`;
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-danger">Error: ${err.message}</td></tr>`;
+            } finally {
+                progress.style.display = 'none';
+            }
+        }
+
+        function renderBulkLinks(files) {
+            const tbody = document.getElementById('bulkLinksBody');
+            tbody.innerHTML = '';
+            if (!files || files.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No files found.</td></tr>';
+                return;
+            }
+
+            files.forEach(file => {
+                const fileName = file.path ? file.path.split(/[\\\\/]/).pop() : 'Unknown';
+                if (file.error) {
+                    tbody.innerHTML += `<tr>
+                        <td>${fileName}</td>
+                        <td colspan="3" class="text-muted">—</td>
+                        <td class="text-danger">${file.error}</td>
+                    </tr>`;
+                    return;
+                }
+
+                if (!file.links || file.links.length === 0) {
+                    tbody.innerHTML += `<tr>
+                        <td>${fileName}</td>
+                        <td colspan="3" class="text-muted">No links</td>
+                        <td>OK</td>
+                    </tr>`;
+                    return;
+                }
+
+                file.links.forEach(link => {
+                    const shortUrl = link.url ? (link.url.length > 50 ? link.url.substring(0, 50) + '...' : link.url) : 'No URL';
+                    tbody.innerHTML += `<tr>
+                        <td>${fileName}</td>
+                        <td>${link.text}</td>
+                        <td><a href="${link.url}" target="_blank" title="${link.url}">${shortUrl}</a></td>
+                        <td>${link.type}</td>
+                        <td>OK</td>
+                    </tr>`;
+                });
+            });
+        }
+
+        function renderDependencies(deps) {
+            const body = document.getElementById('dependencyBodyBulk');
+            body.innerHTML = '';
+            const detailBox = document.getElementById('dependencyDetailsBulk');
+            const label = document.getElementById('dependencySortLabel');
+            detailBox.innerHTML = '';
+            if (!deps || deps.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" class="text-muted">No dependency data.</td></tr>';
+                label.innerText = '';
+                return;
+            }
+            const list = [...deps];
+            if (dependencySort.by === 'outgoing') {
+                list.sort((a, b) => (b.outgoing_files - a.outgoing_files) || a.rel_path.localeCompare(b.rel_path));
+            } else if (dependencySort.by === 'incoming') {
+                list.sort((a, b) => (b.incoming_files - a.incoming_files) || a.rel_path.localeCompare(b.rel_path));
+            }
+            if (dependencySort.dir === 'asc') list.reverse();
+            label.innerText = dependencySort.by ? `Sorted by ${dependencySort.by} (${dependencySort.dir})` : '';
+            list.forEach((d, idx) => {
+                const fileName = d.rel_path || (d.path || '').split(/[\\\\/]/).pop();
+                body.innerHTML += `<tr>
+                    <td>${fileName}</td>
+                    <td><button class="btn btn-link btn-sm p-0" onclick="showDependency(${dependencyData.indexOf(d)}, 'out')">${d.outgoing_files}</button></td>
+                    <td><button class="btn btn-link btn-sm p-0" onclick="showDependency(${dependencyData.indexOf(d)}, 'in')">${d.incoming_files}</button></td>
+                </tr>`;
+            });
+        }
+
+        function sortDependencies(by) {
+            if (dependencySort.by === by) {
+                dependencySort.dir = dependencySort.dir === 'desc' ? 'asc' : 'desc';
+            } else {
+                dependencySort.by = by;
+                dependencySort.dir = 'desc';
+            }
+            renderDependencies(dependencyData);
+        }
+
+        function showDependency(idx, direction) {
+            const detailBox = document.getElementById('dependencyDetailsBulk');
+            const d = dependencyData[idx];
+            if (!d) return;
+            const fileName = d.rel_path || (d.path || '').split(/[\\\\/]/).pop();
+
+            const list = direction === 'out' ? d.outgoing_details : d.incoming_details;
+            if (!list || list.length === 0) {
+                detailBox.innerHTML = `<div class="alert alert-info mt-2">No ${direction === 'out' ? 'outgoing' : 'incoming'} links for ${fileName}.</div>`;
+                return;
+            }
+
+            const rows = list.map(item => {
+                if (direction === 'out') {
+                    return `<tr><td>${item.text || '[no text]'}</td><td>${item.target || ''}</td><td>${item.href || ''}</td></tr>`;
+                }
+                return `<tr><td>${item.from || ''}</td><td>${item.text || '[no text]'}</td><td>${item.href || ''}</td></tr>`;
+            }).join('');
+
+            if (direction === 'out') {
+                detailBox.innerHTML = `
+                <div class="mt-2">
+                    <h6>Outgoing links from ${fileName}</h6>
+                    <div class="table-responsive" style="max-height: 200px;">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light"><tr><th>Text</th><th>Target</th><th>Link</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            } else {
+                detailBox.innerHTML = `
+                <div class="mt-2">
+                    <h6>Incoming links to ${fileName}</h6>
+                    <div class="table-responsive" style="max-height: 200px;">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light"><tr><th>From File</th><th>Link Text</th><th>Link</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }
+        }
+
+        function exportLinksCsv() {
+            if (!cachedBulkLinks || cachedBulkLinks.length === 0) return;
+            const rows = [['File', 'Text', 'URL', 'Type', 'Error']];
+
+            cachedBulkLinks.forEach(file => {
+                const fileName = file.path ? file.path.split(/[\\\\/]/).pop() : '';
+                if (file.error) {
+                    rows.push([fileName, '', '', '', file.error]);
+                } else if (file.links && file.links.length) {
+                    file.links.forEach(link => {
+                        rows.push([fileName, link.text, link.url, link.type, '']);
+                    });
+                } else {
+                    rows.push([fileName, '', '', '', 'No links']);
+                }
+            });
+
+            const csvContent = rows
+                .map(r => r.map(val => `"${String(val || '').replace(/"/g, '""')}"`).join(','))
+                .join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'docx_links.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function downloadXlsxFromServer() {
+            const path = document.getElementById('folderPath').value;
+            if (!path) return alert('Please select a folder first.');
+
+            const btn = document.getElementById('exportLinksXlsxBtn');
+            if (btn) btn.disabled = true;
+
+            try {
+                const resp = await fetch('/export_links_xlsx', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path })
+                });
+
+                const contentType = resp.headers.get('content-type') || '';
+                if (!resp.ok) {
+                    let err = null;
+                    try { err = await resp.json(); } catch(e) { err = await resp.text(); }
+                    throw new Error(err && err.error ? err.error : (typeof err === 'string' ? err : resp.statusText));
+                }
+
+                // Expect binary workbook
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'docx_links.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Export failed: ' + (err && err.message ? err.message : err));
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function exportDependenciesCsv() {
+            if (!dependencyData || dependencyData.length === 0) return;
+            const rows = [['File', 'LinksToOtherFiles', 'OtherFilesLinkingHere']];
+            dependencyData.forEach(d => {
+                const fileName = d.rel_path || (d.path || '').split(/[\\/]/).pop();
+                rows.push([fileName, d.outgoing_files, d.incoming_files]);
+            });
+            const csvContent = rows.map(r => r.map(val => `"${String(val || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'docx_dependencies.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- Bulk Find/Replace ---
+        async function bulkFindReplace(isReplace) {
+            const path = document.getElementById('folderPath').value;
+            const findText = document.getElementById('bulkFindInput').value;
+            const replaceText = document.getElementById('bulkReplaceInput').value;
+            const resultDiv = document.getElementById('bulkResult');
+            const body = document.getElementById('bulkFindBody');
+
+            if (!path) return alert("Please select a folder first.");
+            if (!findText) return alert("Enter find text.");
+            if (isReplace && !confirm("Replace across all files? This will overwrite files.")) return;
+
+            resultDiv.style.display = 'none';
+                body.innerHTML = '<tr><td colspan="6">Working...</td></tr>';
+
+            try {
+                const res = await fetch('/bulk_find_replace', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                    path,
+                    find_text: findText,
+                    replace_text: isReplace ? replaceText : null,
+                    save_copies: (document.getElementById('bulkSaveCopiesCheckboxBulk') || {checked:true}).checked
+                        })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Bulk find/replace failed');
+
+                resultDiv.style.display = 'block';
+                resultDiv.className = isReplace ? 'alert alert-warning' : 'alert alert-info';
+                resultDiv.innerText = `${isReplace ? 'Replace' : 'Find'} completed. Total matches: ${data.total_matches || 0}. Files scanned: ${data.files ? data.files.length : 0}.`;
+
+                // Show saved copies summary if present (use save_root sent by server when available)
+                try {
+                    const copies = (data.files || []).filter(f => f.copy_path);
+                    if (copies.length > 0) {
+                        const saveFolder = data.save_root || (path.replace(/\\/g, '/') + '/bulk_found');
+                        resultDiv.innerText += ` Saved copies: ${copies.length}. Location: ${saveFolder}`;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+
+                renderBulkFindResults(data.files || []);
+            } catch (err) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerText = err.message;
+                    body.innerHTML = '<tr><td colspan="6" class="text-danger">Error</td></tr>';
+            }
+        }
+
+        function renderBulkFindResults(files) {
+            const body = document.getElementById('bulkFindBody');
+            body.innerHTML = '';
+            if (!files || files.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="text-muted">No files processed.</td></tr>';
+                return;
+            }
+
+            files
+                .filter(file => (file.matches || 0) > 0)
+                .forEach(file => {
+                    const fullPath = file.path || '';
+                    const fileName = fullPath ? fullPath.split(/[\\\\/]/).pop() : 'Unknown';
+                    const fileUri = fullPath ? 'file://' + fullPath.replace(/\\/g, '/') : '#';
+                    const fileLink = fullPath ? `<a href="${encodeURI(fileUri)}" title="${fullPath}">${fileName}</a>` : fileName;
+                    const snippet = file.snippets && file.snippets.length ? file.snippets[0] : '';
+                    const error = file.error || '';
+                    const copyPath = file.copy_path || '';
+                    const copyLink = copyPath ? `<a href="${encodeURI('file://' + copyPath.replace(/\\/g, '/'))}" target="_blank">Open</a>` : '';
+                    body.innerHTML += `<tr>
+                        <td>${fileLink}</td>
+                        <td>${file.matches}</td>
+                        <td>${file.status || ''}</td>
+                        <td>${snippet ? snippet.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</td>
+                        <td>${copyLink}</td>
+                        <td class="text-danger">${error}</td>
+                    </tr>`;
+                });
+
+            if (!body.innerHTML) {
+                body.innerHTML = '<tr><td colspan="6" class="text-muted">No matches found.</td></tr>';
+            }
+        }
+
+        // --- Bulk Links Find/Replace ---
+        async function bulkLinksFindReplace(isReplace) {
+            const path = document.getElementById('folderPath').value;
+            const findText = document.getElementById('bulkLinkFindInput').value;
+            const replaceText = document.getElementById('bulkLinkReplaceInput').value;
+            const target = document.getElementById('bulkLinkTargetSelect').value || 'both';
+            const resultDiv = document.getElementById('bulkLinkResult');
+            const body = document.getElementById('bulkLinkFindBody');
+
+            if (!path) return alert("Please select a folder first.");
+            if (!findText) return alert("Enter find text.");
+            if (isReplace && !confirm("Replace links across all files? This will overwrite files.")) return;
+
+            resultDiv.style.display = 'none';
+            body.innerHTML = '<tr><td colspan="6">Working...</td></tr>';
+
+            try {
+                const res = await fetch('/bulk_links_find_replace', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path,
+                        find_text: findText,
+                        replace_text: isReplace ? replaceText : null,
+                        target,
+                        save_copies: (document.getElementById('bulkSaveCopiesCheckboxLinks') || {checked:true}).checked
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Bulk links find/replace failed');
+
+                resultDiv.style.display = 'block';
+                resultDiv.className = isReplace ? 'alert alert-warning' : 'alert alert-info';
+                resultDiv.innerText = `${isReplace ? 'Replace' : 'Find'} completed. Total matches: ${data.total_matches || 0}. Files scanned: ${data.files ? data.files.length : 0}.`;
+
+                try {
+                    const copies = (data.files || []).filter(f => f.copy_path);
+                    if (copies.length > 0) {
+                        const saveFolder = data.save_root || (path.replace(/\\/g, '/') + '/bulk_found');
+                        resultDiv.innerText += ` Saved copies: ${copies.length}. Location: ${saveFolder}`;
+                    }
+                } catch (e) {}
+
+                renderBulkLinkFindResults(data.files || []);
+            } catch (err) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerText = err.message;
+                body.innerHTML = '<tr><td colspan="6" class="text-danger">Error</td></tr>';
+            }
+        }
+
+        function renderBulkLinkFindResults(files) {
+            const body = document.getElementById('bulkLinkFindBody');
+            body.innerHTML = '';
+            if (!files || files.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="text-muted">No files processed.</td></tr>';
+                return;
+            }
+
+            files
+                .filter(file => (file.matches || 0) > 0)
+                .forEach(file => {
+                    const fullPath = file.path || '';
+                    const fileName = fullPath ? fullPath.split(/[\\\\/]/).pop() : 'Unknown';
+                    const fileUri = fullPath ? 'file://' + fullPath.replace(/\\/g, '/') : '#';
+                    const fileLink = fullPath ? `<a href="${encodeURI(fileUri)}" title="${fullPath}">${fileName}</a>` : fileName;
+                    const snippet = file.snippets && file.snippets.length ? file.snippets[0] : '';
+                    const error = file.error || '';
+                    const copyPath = file.copy_path || '';
+                    const copyLink = copyPath ? `<a href="${encodeURI('file://' + copyPath.replace(/\\/g, '/'))}" target="_blank">Open</a>` : '';
+                    body.innerHTML += `<tr>
+                        <td>${fileLink}</td>
+                        <td>${file.matches}</td>
+                        <td>${file.status || ''}</td>
+                        <td>${snippet ? snippet.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</td>
+                        <td>${copyLink}</td>
+                        <td class="text-danger">${error}</td>
+                    </tr>`;
+                });
+
+            if (!body.innerHTML) {
+                body.innerHTML = '<tr><td colspan="6" class="text-muted">No matches found.</td></tr>';
+            }
+        }
+    </script>
+
+    <footer class="text-center mt-4 mb-4">
+        <small class="text-muted">© 2025 Jialei Qian. All rights reserved.</small>
+    </footer>
+
+</body>
+
+</html>
