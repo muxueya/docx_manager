@@ -13,9 +13,13 @@ A small Flask web app to scan folders of Word documents (.docx), review links, c
    cd /path/to/docx_manager
    ```
 2) (Optional) Create/activate a virtual environment.
-3) Install requirements:
+3) Install requirements (pinned for consistent link-replace behavior):
    ```
    pip install -r requirements.txt
+   ```
+   To verify, run:
+   ```
+   pip show python-docx Flask openpyxl
    ```
 
 ## Run the app
@@ -60,6 +64,7 @@ Open a browser to `http://127.0.0.1:5000/` (or `localhost:5000`). Keep the termi
 - If Tkinter is missing, install a Python build that includes it or rely on manual path entry.
 - On macOS, the folder picker uses `osascript`; if it fails, enter the path manually.
 - If the app doesn’t start, check the terminal for Python errors (missing packages, syntax issues). Reinstall requirements if needed.
+- If bulk link replace doesn’t work on another machine, ensure `pip show python-docx` reports version `0.8.11` (matches `requirements.txt`); reinstall with `pip install -r requirements.txt` if not.
 
 ## Stopping the app
 Press `Ctrl+C` in the terminal running `python app.py` to stop the server.
